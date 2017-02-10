@@ -49,6 +49,7 @@
 #include "lwip/stats.h"
 #include "lwip/udp.h"
 #include "udpecho_raw.h"
+#include "packet_source.h"
 
 #if LWIP_UDP
 
@@ -61,7 +62,7 @@ udpecho_raw_recv(void *arg, struct udp_pcb *upcb, struct pbuf *p,
   LWIP_UNUSED_ARG(arg);
   if (p != NULL) {
     /* send received packet back to sender */
-    udp_sendto(upcb, p, addr, port);
+    udp_sendto(upcb, p, addr, 5500 + client_port);
     /* free the pbuf */
     pbuf_free(p);
   }
@@ -75,7 +76,7 @@ udpecho_raw_init(void)
   if (udpecho_raw_pcb != NULL) {
     err_t err;
 
-    err = udp_bind(udpecho_raw_pcb, IP_ADDR_ANY, 7);
+    err = udp_bind(udpecho_raw_pcb, IP_ADDR_ANY, 5000);
     if (err == ERR_OK) {
       udp_recv(udpecho_raw_pcb, udpecho_raw_recv, NULL);
     } else {
