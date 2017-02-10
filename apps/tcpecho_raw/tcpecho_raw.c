@@ -67,27 +67,27 @@ struct echo_state
   struct pbuf *p;
 };
 
-err_t echo_accept(void *arg, struct tcp_pcb *newpcb, err_t err);
-err_t echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
-void echo_error(void *arg, err_t err);
-err_t echo_poll(void *arg, struct tcp_pcb *tpcb);
-err_t echo_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
-void echo_send(struct tcp_pcb *tpcb, struct echo_state *es);
-void echo_close(struct tcp_pcb *tpcb, struct echo_state *es);
+err_t tcpecho_raw_accept(void *arg, struct tcp_pcb *newpcb, err_t err);
+err_t tcpecho_raw_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
+void tcpecho_raw_error(void *arg, err_t err);
+err_t tcpecho_raw_poll(void *arg, struct tcp_pcb *tpcb);
+err_t tcpecho_raw_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
+void tcpecho_raw_send(struct tcp_pcb *tpcb, struct echo_state *es);
+void tcpecho_raw_close(struct tcp_pcb *tpcb, struct echo_state *es);
 
 void
-echo_init(void)
+tcpecho_raw_init(void)
 {
   echo_pcb = tcp_new();
   if (echo_pcb != NULL)
   {
     err_t err;
 
-    err = tcp_bind(echo_pcb, IP_ADDR_ANY, 7);
+    err = tcp_bind(echo_pcb, IP_ADDR_ANY, 8);
     if (err == ERR_OK)
     {
       echo_pcb = tcp_listen(echo_pcb);
-      tcp_accept(echo_pcb, echo_accept);
+      tcp_accept(echo_pcb, tcpecho_raw_accept);
     }
     else 
     {
@@ -102,7 +102,7 @@ echo_init(void)
 
 
 err_t
-echo_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
+tcpecho_raw_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
   err_t ret_err;
   struct echo_state *es;
@@ -124,9 +124,9 @@ echo_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
     es->p = NULL;
     /* pass newly allocated es to our callbacks */
     tcp_arg(newpcb, es);
-    tcp_recv(newpcb, echo_recv);
-    tcp_err(newpcb, echo_error);
-    tcp_poll(newpcb, echo_poll, 0);
+    tcp_recv(newpcb, tcpecho_raw_recv);
+    tcp_err(newpcb, tcpecho_raw_error);
+    tcp_poll(newpcb, tcpecho_raw_poll, 0);
     ret_err = ERR_OK;
   }
   else
@@ -137,7 +137,7 @@ echo_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
 }
 
 err_t
-echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
+tcpecho_raw_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
   struct echo_state *es;
   err_t ret_err;
@@ -151,13 +151,13 @@ echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
     if(es->p == NULL)
     {
        /* we're done sending, close it */
-       echo_close(tpcb, es);
+       tcpecho_raw_close(tpcb, es);
     }
     else
     {
       /* we're not done yet */
-      tcp_sent(tpcb, echo_sent);
-      echo_send(tpcb, es);
+      tcp_sent(tpcb, tcpecho_raw_sent);
+      tcpecho_raw_send(tpcb, es);
     }
     ret_err = ERR_OK;
   }
@@ -178,8 +178,8 @@ echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
     /* store reference to incoming pbuf (chain) */
     es->p = p;
     /* install send completion notifier */
-    tcp_sent(tpcb, echo_sent);
-    echo_send(tpcb, es);
+    tcp_sent(tpcb, tcpecho_raw_sent);
+    tcpecho_raw_send(tpcb, es);
     ret_err = ERR_OK;
   }
   else if (es->state == ES_RECEIVED)
@@ -188,8 +188,8 @@ echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
     if(es->p == NULL)
     {
       es->p = p;
-      tcp_sent(tpcb, echo_sent);
-      echo_send(tpcb, es);
+      tcp_sent(tpcb, tcpecho_raw_sent);
+      tcpecho_raw_send(tpcb, es);
     }
     else
     {
@@ -221,7 +221,7 @@ echo_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 }
 
 void
-echo_error(void *arg, err_t err)
+tcpecho_raw_error(void *arg, err_t err)
 {
   struct echo_state *es;
 
@@ -235,7 +235,7 @@ echo_error(void *arg, err_t err)
 }
 
 err_t
-echo_poll(void *arg, struct tcp_pcb *tpcb)
+tcpecho_raw_poll(void *arg, struct tcp_pcb *tpcb)
 {
   err_t ret_err;
   struct echo_state *es;
@@ -246,15 +246,15 @@ echo_poll(void *arg, struct tcp_pcb *tpcb)
     if (es->p != NULL)
     {
       /* there is a remaining pbuf (chain)  */
-      tcp_sent(tpcb, echo_sent);
-      echo_send(tpcb, es);
+      tcp_sent(tpcb, tcpecho_raw_sent);
+      tcpecho_raw_send(tpcb, es);
     }
     else
     {
       /* no remaining pbuf (chain)  */
       if(es->state == ES_CLOSING)
       {
-        echo_close(tpcb, es);
+        tcpecho_raw_close(tpcb, es);
       }
     }
     ret_err = ERR_OK;
@@ -269,7 +269,7 @@ echo_poll(void *arg, struct tcp_pcb *tpcb)
 }
 
 err_t
-echo_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
+tcpecho_raw_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
 {
   struct echo_state *es;
 
@@ -281,22 +281,22 @@ echo_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
   if(es->p != NULL)
   {
     /* still got pbufs to send */
-    tcp_sent(tpcb, echo_sent);
-    echo_send(tpcb, es);
+    tcp_sent(tpcb, tcpecho_raw_sent);
+    tcpecho_raw_send(tpcb, es);
   }
   else
   {
     /* no more pbufs to send */
     if(es->state == ES_CLOSING)
     {
-      echo_close(tpcb, es);
+      tcpecho_raw_close(tpcb, es);
     }
   }
   return ERR_OK;
 }
 
 void
-echo_send(struct tcp_pcb *tpcb, struct echo_state *es)
+tcpecho_raw_send(struct tcp_pcb *tpcb, struct echo_state *es)
 {
   struct pbuf *ptr;
   err_t wr_err = ERR_OK;
@@ -345,7 +345,7 @@ echo_send(struct tcp_pcb *tpcb, struct echo_state *es)
 }
 
 void
-echo_close(struct tcp_pcb *tpcb, struct echo_state *es)
+tcpecho_raw_close(struct tcp_pcb *tpcb, struct echo_state *es)
 {
   tcp_arg(tpcb, NULL);
   tcp_sent(tpcb, NULL);
